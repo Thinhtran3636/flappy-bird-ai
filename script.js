@@ -99,51 +99,59 @@ function xuLyCuChi(banTay) {
 function veKhungXuongDep(banTay) {
     const w = canvasElement.width;
     const h = canvasElement.height;
+    const scale = Math.max(0.8, w / 640); // Tự co giãn độ nét chuẩn theo độ phân giải webcam
 
     canvasCtx.save();
+    // Chế độ cộng hưởng ánh sáng (giúp hào quang tỏa sáng lung linh y như ảnh mẫu)
+    canvasCtx.globalCompositeOperation = "lighter";
 
+    // 1. Vẽ các đường xương siêu mảnh màu trắng ánh hồng phát sáng dịu
     canvasCtx.beginPath();
     for (const ketNoi of HandLandmarker.HAND_CONNECTIONS) {
-        const diemDau = banTay[ketNoi.start];
-        const diemCuoi = banTay[ketNoi.end];
-        canvasCtx.moveTo(diemDau.x * w, diemDau.y * h);
-        canvasCtx.lineTo(diemCuoi.x * w, diemCuoi.y * h);
+        const d1 = banTay[ketNoi.start];
+        const d2 = banTay[ketNoi.end];
+        canvasCtx.moveTo(d1.x * w, d1.y * h);
+        canvasCtx.lineTo(d2.x * w, d2.y * h);
     }
-    canvasCtx.strokeStyle = "rgba(0, 245, 255, 0.85)";
-    canvasCtx.lineWidth = 3;
+    canvasCtx.strokeStyle = "rgba(255, 240, 246, 0.85)";
+    canvasCtx.lineWidth = 1.6 * scale;
     canvasCtx.lineCap = "round";
-    canvasCtx.shadowColor = "#00f5ff";
-    canvasCtx.shadowBlur = 12;
+    canvasCtx.shadowColor = "rgba(255, 145, 180, 0.95)";
+    canvasCtx.shadowBlur = 10 * scale;
     canvasCtx.stroke();
 
-    const cacDauNgonTay = [4, 8, 12, 16, 20];
-    banTay.forEach((diem, chiSo) => {
+    // Tắt shadowBlur trước khi vẽ 21 lớp hào quang để giữ mượt 60 FPS
+    canvasCtx.shadowBlur = 0;
+
+    // 2. Vẽ 21 đốm sáng trắng tỏa hào quang hồng phấn tại từng khớp tay
+    const rHalo = 16 * scale;
+    const rCore = 2.6 * scale;
+
+    for (const diem of banTay) {
         const x = diem.x * w;
         const y = diem.y * h;
-        const laDauNgon = cacDauNgonTay.includes(chiSo);
+
+        // Vầng hào quang tỏa tròn mờ dần từ tâm trắng -> hồng phấn -> trong suốt
+        const halo = canvasCtx.createRadialGradient(x, y, 0, x, y, rHalo);
+        halo.addColorStop(0, "rgba(255, 255, 255, 0.95)");
+        halo.addColorStop(0.22, "rgba(255, 225, 236, 0.78)");
+        halo.addColorStop(0.55, "rgba(255, 150, 185, 0.28)");
+        halo.addColorStop(1, "rgba(255, 130, 170, 0)");
 
         canvasCtx.beginPath();
-        canvasCtx.arc(x, y, laDauNgon ? 6 : 3.5, 0, Math.PI * 2);
+        canvasCtx.arc(x, y, rHalo, 0, Math.PI * 2);
+        canvasCtx.fillStyle = halo;
+        canvasCtx.fill();
 
-        if (laDauNgon) {
-            canvasCtx.fillStyle = "#ffffff";
-            canvasCtx.strokeStyle = "#ff2e93";
-            canvasCtx.lineWidth = 2.5;
-            canvasCtx.shadowColor = "#ff2e93";
-            canvasCtx.shadowBlur = 15;
-            canvasCtx.fill();
-            canvasCtx.stroke();
-        } else {
-            canvasCtx.fillStyle = "#ffffff";
-            canvasCtx.shadowColor = "#00f5ff";
-            canvasCtx.shadowBlur = 8;
-            canvasCtx.fill();
-        }
-    });
+        // Lõi sáng trắng tinh ở chính giữa khớp
+        canvasCtx.beginPath();
+        canvasCtx.arc(x, y, rCore, 0, Math.PI * 2);
+        canvasCtx.fillStyle = "#ffffff";
+        canvasCtx.fill();
+    }
 
     canvasCtx.restore();
 }
-
 async function khoiTaoAI() {
     const vision = await FilesetResolver.forVisionTasks(
         "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm"
